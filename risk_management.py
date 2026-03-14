@@ -48,8 +48,8 @@ class RiskManager:
         # Riesgo de referencia para logging
         risk_amount = self.account_balance * self.risk_per_trade
 
-        # Position sizing proporcional a la confianza: mín 10%, máx 95% del balance
-        confidence_clamped = max(0.10, min(0.95, confidence))
+        # Position sizing proporcional a la confianza: mín 10%, máx 50% del balance
+        confidence_clamped = max(0.10, min(0.50, confidence))
         position_value     = self.account_balance * confidence_clamped
         position_size      = position_value / entry_price
 

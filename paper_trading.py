@@ -10,6 +10,10 @@ class PaperTrader:
         self.pnl_total = 0.0
 
     def execute_trade(self, symbol, strategy_name, side, price, qty, sl, tp):
+        if any(t["symbol"] == symbol for t in self.open_trades):
+            print(f"⏸️  [Paper Trading] Ya hay posición abierta en {symbol} — trade rechazado")
+            return
+
         position_value = qty * price
         if position_value > self.balance:
             print(f"⚠️  [Paper Trading] Capital insuficiente para {symbol}: "

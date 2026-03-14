@@ -154,13 +154,14 @@ if __name__ == "__main__":
                         current_price = df['close'].iloc[-1]
                         current_prices[symbol] = current_price
 
+                        # Fase 1: recoger señales de todas las estrategias
+                        symbol_signals = []  # [(strategy_name, signal, confidence)]
                         for strategy in strategies:
                             strategy.analyze(df)
                             signal     = strategy.get_signal(df)
                             confidence = strategy.get_confidence(df)
                             print(f"  {symbol} | {strategy.name}: {signal} | Confianza: {confidence:.0%}")
 
-                            # Registrar señal para el dashboard (todas, no solo != HOLD)
                             cycle_signals.append({
                                 "symbol":     symbol,
                                 "strategy":   strategy.name,
@@ -170,21 +171,35 @@ if __name__ == "__main__":
                             })
 
                             if signal != "HOLD":
-                                risk_data = risk_manager.calculate_levels(
-                                    current_price, signal, df, confidence)
+                                symbol_signals.append((strategy.name, signal, confidence))
 
-                                if PAPER_TRADING:
-                                    paper_trader.execute_trade(
-                                        symbol, strategy.name, signal, current_price,
-                                        risk_data['position_size'],
-                                        risk_data['stop_loss_price'],
-                                        risk_data['take_profit_price']
-                                    )
-                                    trade_logger.log_trade(
-                                        symbol, strategy.name, signal, current_price,
-                                        risk_data['stop_loss_price'], risk_data['take_profit_price'],
-                                        risk_data['position_size'], risk_data['risk_amount'], "PAPER"
-                                    )
+                        # Filtro 1: señales contradictorias → ignorar ambas
+                        directions = {sig for _, sig, _ in symbol_signals}
+                        if "BUY" in directions and "SELL" in directions:
+                            print(f"  ⚠️  {symbol}: BUY+SELL en el mismo ciclo — mercado indeciso, ignorado")
+                            continue
+
+                        # Filtro 2: confianza mínima + ejecución
+                        for strat_name, signal, confidence in symbol_signals:
+                            if confidence < 0.30:
+                                print(f"  🔕 {symbol} | {strat_name}: conf={confidence:.0%} < 30% — ignorado")
+                                continue
+
+                            risk_data = risk_manager.calculate_levels(
+                                current_price, signal, df, confidence)
+
+                            if PAPER_TRADING:
+                                paper_trader.execute_trade(
+                                    symbol, strat_name, signal, current_price,
+                                    risk_data['position_size'],
+                                    risk_data['stop_loss_price'],
+                                    risk_data['take_profit_price']
+                                )
+                                trade_logger.log_trade(
+                                    symbol, strat_name, signal, current_price,
+                                    risk_data['stop_loss_price'], risk_data['take_profit_price'],
+                                    risk_data['position_size'], risk_data['risk_amount'], "PAPER"
+                                )
                     except Exception as e:
                         print(f"Error en {symbol}: {e}")
 

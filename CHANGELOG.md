@@ -4,6 +4,21 @@ Todos los cambios notables de este proyecto están documentados en este archivo.
 
 ---
 
+## v1.1.0 — 2026-03-14
+
+### Mejorado
+- Filtro de señales contradictorias: si en el mismo ciclo hay BUY y SELL para el mismo par, se ignoran ambas (mercado indeciso)
+- Confianza mínima del 30% para ejecutar trades — señales débiles descartadas antes de operar
+- Máximo 50% del balance por operación (antes 95%) — protección de capital más conservadora
+- Límite de 1 posición abierta por par simultáneamente — evita acumulación de posiciones contradictorias
+
+### Corregido
+- Sobreoperación: reducción drástica del número de trades por ciclo gracias a los filtros de calidad
+- Posiciones contradictorias BUY+SELL en el mismo par dentro del mismo ciclo
+- Capital excesivo en una sola operación cuando la confianza era alta
+
+---
+
 ## v1.0.0 — 2026-03-14
 
 ### Agregado
