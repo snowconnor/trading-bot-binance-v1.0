@@ -1,0 +1,12 @@
+.env
+__pycache__/
+*.pyc
+trade_log.csv
+pnl_history.json
+session_state.json
+live_data.json
+live_data.json.tmp
+reporte_sesion.txt
+reporte_diario.xlsx
+*.log
+*.bak
