@@ -44,26 +44,26 @@ class PaperTrader:
                 still_open.append(trade)
                 continue
 
-            closed = False
-            pnl = 0.0
+            closed     = False
+            pnl        = 0.0
+            exit_price = None   # precio real de cierre (SL, TP o mercado)
 
             if trade['close_at_next']:
-                # PnL=0 en ciclo anterior: cerrar ahora al precio actual de mercado
+                # PnL=0 en ciclo anterior: cerrar ahora al precio de mercado
+                exit_price = current_price
                 if trade['side'] == 'BUY':
-                    pnl = (current_price - trade['entry_price']) * trade['quantity']
+                    pnl = (exit_price - trade['entry_price']) * trade['quantity']
                 else:
-                    pnl = (trade['entry_price'] - current_price) * trade['quantity']
+                    pnl = (trade['entry_price'] - exit_price) * trade['quantity']
                 closed = True
 
             elif current_price != trade['entry_price']:
                 if trade['side'] == 'BUY':
                     if current_price >= trade['tp']:
-                        # Cierre en TP: PnL máximo es el precio exacto del TP, no el precio de mercado
                         exit_price = trade['tp']
                         pnl = (exit_price - trade['entry_price']) * trade['quantity']
                         closed = True
                     elif current_price <= trade['sl']:
-                        # Cierre en SL: pérdida limitada al precio del SL
                         exit_price = trade['sl']
                         pnl = (exit_price - trade['entry_price']) * trade['quantity']
                         closed = True
@@ -78,13 +78,13 @@ class PaperTrader:
                         closed = True
 
             else:
-                # Precio igual al de entrada → PnL=0, marcar para cerrar en la siguiente vela
+                # Precio igual al de entrada → marcar para cerrar en la siguiente vela
                 trade['close_at_next'] = True
 
             if closed:
                 self.pnl_total += pnl
-                self.balance += pnl
-                trade.update({'status': 'CLOSED', 'pnl': pnl, 'exit_price': current_price})
+                self.balance   += pnl
+                trade.update({'status': 'CLOSED', 'pnl': pnl, 'exit_price': exit_price})
                 self.closed_trades.append(trade)
             else:
                 still_open.append(trade)

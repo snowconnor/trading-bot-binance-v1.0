@@ -133,30 +133,49 @@ class ScalpingStrategy(BaseStrategy):
 
     def analyze(self, df: pd.DataFrame):
         bb = BollingerBands(close=df['close'], window=self.length, window_dev=self.std)
-        df['bb_low'] = bb.bollinger_lband()
-        df['bb_mid'] = bb.bollinger_mavg()
-        df['rsi'] = RSIIndicator(close=df['close'], window=14).rsi()
+        df['bb_low']  = bb.bollinger_lband()
+        df['bb_mid']  = bb.bollinger_mavg()
+        df['bb_high'] = bb.bollinger_hband()
+        df['rsi']     = RSIIndicator(close=df['close'], window=14).rsi()
+        df['sc_ema9']  = EMAIndicator(close=df['close'], window=9).ema_indicator()
+        df['sc_ema21'] = EMAIndicator(close=df['close'], window=21).ema_indicator()
         return df
 
     def should_buy(self, df: pd.DataFrame) -> bool:
-        rsi_filter = (df['rsi'].iloc[-1] > 20) and (df['rsi'].iloc[-1] < 80)
-        return (df['close'].iloc[-1] <= df['bb_low'].iloc[-1]) and rsi_filter
+        rsi_filter  = (df['rsi'].iloc[-1] > 20) and (df['rsi'].iloc[-1] < 80)
+        band_width  = df['bb_high'].iloc[-1] - df['bb_low'].iloc[-1]
+        lower_20pct = df['bb_low'].iloc[-1] + 0.20 * band_width
+        uptrend     = df['sc_ema9'].iloc[-1] > df['sc_ema21'].iloc[-1]
+        return (df['close'].iloc[-1] <= lower_20pct) and rsi_filter and uptrend
 
     def should_sell(self, df: pd.DataFrame) -> bool:
-        rsi_filter = (df['rsi'].iloc[-1] > 20) and (df['rsi'].iloc[-1] < 80)
-        return (df['close'].iloc[-1] >= df['bb_mid'].iloc[-1]) and rsi_filter
+        rsi_filter  = (df['rsi'].iloc[-1] > 20) and (df['rsi'].iloc[-1] < 80)
+        band_width  = df['bb_high'].iloc[-1] - df['bb_low'].iloc[-1]
+        upper_80pct = df['bb_high'].iloc[-1] - 0.20 * band_width
+        downtrend   = df['sc_ema9'].iloc[-1] < df['sc_ema21'].iloc[-1]
+        return (df['close'].iloc[-1] >= upper_80pct) and rsi_filter and downtrend
 
     def get_confidence(self, df: pd.DataFrame) -> float:
-        """Qué tan cerca está el precio del borde de la banda de Bollinger.
-        (bb_mid - price) / (bb_mid - bb_low): 1.0 = precio en el borde inferior."""
+        """Distancia normalizada al borde de la banda según dirección de la señal.
+        BUY : (bb_mid - price) / (bb_mid - bb_low)  → 1.0 cuando price == bb_low
+        SELL: (price - bb_mid) / (bb_high - bb_mid) → 1.0 cuando price == bb_high"""
         try:
-            price  = df['close'].iloc[-1]
-            bb_mid = df['bb_mid'].iloc[-1]
-            bb_low = df['bb_low'].iloc[-1]
-            band_width = bb_mid - bb_low
-            if band_width == 0 or pd.isna(band_width):
+            price   = df['close'].iloc[-1]
+            bb_mid  = df['bb_mid'].iloc[-1]
+            bb_low  = df['bb_low'].iloc[-1]
+            bb_high = df['bb_high'].iloc[-1]
+            if any(pd.isna(v) for v in (price, bb_mid, bb_low, bb_high)):
                 return 0.5
-            return min(max((bb_mid - price) / band_width, 0.0), 1.0)
+            if price <= bb_mid:
+                band_width = bb_mid - bb_low
+                if band_width == 0:
+                    return 0.5
+                return min(max((bb_mid - price) / band_width, 0.0), 1.0)
+            else:
+                band_width = bb_high - bb_mid
+                if band_width == 0:
+                    return 0.5
+                return min(max((price - bb_mid) / band_width, 0.0), 1.0)
         except Exception:
             return 0.5
 

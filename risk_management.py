@@ -10,7 +10,7 @@ class RiskManager:
     - max_position_pct = 20% → la posición no puede valer más de 2.0 USDT
       (evita apalancamiento implícito en monedas con ATR muy pequeño)
     """
-    def __init__(self, atr_period=14, risk_per_trade=0.01, reward_ratio=2.0,
+    def __init__(self, atr_period=14, risk_per_trade=0.01, reward_ratio=3.0,
                  account_balance=10.0):
         self.atr_period      = atr_period
         self.risk_per_trade  = risk_per_trade  # 1 % del balance (referencia)
@@ -26,30 +26,38 @@ class RiskManager:
         """
         Calcula niveles de riesgo con position sizing proporcional a la confianza.
 
-        SL = ATR × 1.5
-        TP = SL × reward_ratio (1:2)
-        position_value = balance * confidence  (mín 10%, máx 95%)
+        SL = ATR × 2.0  (cap: 3% del precio)
+        TP = SL × reward_ratio  (cap: 9% del precio)
+        BUY : SL = precio - distancia_sl  |  TP = precio + distancia_tp
+        SELL: SL = precio + distancia_sl  |  TP = precio - distancia_tp
+        position_value = balance * confidence  (mín 10%, máx 50%)
         """
         atr = AverageTrueRange(high=df['high'], low=df['low'], close=df['close'],
                                window=self.atr_period)
         current_atr = atr.average_true_range().iloc[-1]
 
-        stop_loss_distance = current_atr * 1.5
-        if stop_loss_distance <= 0 or entry_price <= 0:
-            stop_loss_distance = entry_price * 0.01
+        # Cap de SL: máximo 3% del precio de entrada
+        raw_sl_distance = current_atr * 2.0
+        if raw_sl_distance <= 0 or entry_price <= 0:
+            raw_sl_distance = entry_price * 0.01
+        stop_loss_distance = min(raw_sl_distance, entry_price * 0.03)
+
+        # Cap de TP: máximo 9% del precio de entrada
+        raw_tp_distance    = stop_loss_distance * self.reward_ratio
+        take_profit_distance = min(raw_tp_distance, entry_price * 0.09)
 
         if signal == "BUY":
             stop_loss_price   = entry_price - stop_loss_distance
-            take_profit_price = entry_price + (stop_loss_distance * self.reward_ratio)
+            take_profit_price = entry_price + take_profit_distance
         else:  # SELL
             stop_loss_price   = entry_price + stop_loss_distance
-            take_profit_price = entry_price - (stop_loss_distance * self.reward_ratio)
+            take_profit_price = entry_price - take_profit_distance
 
         # Riesgo de referencia para logging
         risk_amount = self.account_balance * self.risk_per_trade
 
-        # Position sizing proporcional a la confianza: mín 10%, máx 50% del balance
-        confidence_clamped = max(0.10, min(0.50, confidence))
+        # Position sizing proporcional a la confianza: mín 20%, máx 70% del balance
+        confidence_clamped = max(0.20, min(0.70, confidence))
         position_value     = self.account_balance * confidence_clamped
         position_size      = position_value / entry_price
 

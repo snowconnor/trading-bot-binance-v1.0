@@ -4,6 +4,34 @@ Todos los cambios notables de este proyecto están documentados en este archivo.
 
 ---
 
+## v1.2.0 — 2026-03-17
+
+### Mejorado
+- ScalpingStrategy: filtro de tendencia con EMA9/EMA21 — solo BUY en mercado alcista (EMA9 > EMA21), solo SELL en bajista
+- Límite global de 3 posiciones abiertas simultáneas (antes ilimitado)
+- RiskManager: cap de capital por operación ajustado a [20%, 70%] del balance (antes [10%, 50%])
+- RiskManager: límite máximo SL 3% del precio, TP 9% del precio — evita niveles irreales con ATR alto en 15m
+- Filtro de contradictorias mejorado: aplica solo sobre señales que superan min_confidence
+- Filtro de tendencia para Scalping: requiere TrendFollowing conf ≥ 50% (ADX ≥ 25) para operar
+- Timeframe cambiado de 1h a 15m para mayor frecuencia de señales en mercado lateral
+- Controles del dashboard: selector de duración de sesión (30m/1h/2h/4h/8h/24h/Continuo ∞)
+- Dashboard: countdown interpolado localmente cada segundo, sin saltos en cada fetch
+- Dashboard: controles se sincronizan desde bot_control.json al cargar la página (F5)
+
+### Corregido
+- Take Profit negativo en órdenes SELL: ATR × 6 superaba el precio de entrada (ahora cap 9%)
+- Sesiones reiniciándose al cambiar duración: end_time se recalculaba desde session_start_time pudiendo quedar en el pasado
+- Countdown del dashboard reiniciándose a valores antiguos cada 15s (re-anclaje solo cuando last_update cambia)
+- exit_price en trades cerrados guardaba current_price en lugar del precio real de TP/SL
+- Acción new_session preservándose accidentalmente al aplicar settings de capital o intervalo
+- ScalpingStrategy.get_confidence() retornando 0 en señales SELL (fórmula solo cubría BUY)
+
+### Resultados
+- Win Rate mejoró de 40% a 80%
+- PnL positivo +0.40% en última sesión de prueba
+
+---
+
 ## v1.1.0 — 2026-03-14
 
 ### Mejorado
